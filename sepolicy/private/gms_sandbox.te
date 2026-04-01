@@ -1,0 +1,18 @@
+# type para el binario emulado de Google Play Services
+type gms_sandbox, domain, coredomain;
+type gms_sandbox_exec, system_file_type, exec_type, file_type;
+
+# Transición estándar de init para un dominio de aplicación
+init_daemon_domain(gms_sandbox)
+
+# Restricción Absoluta (Blackhole Sandbox)
+# Este proxy no puede contactar a internet real. Su socket está ciego.
+neverallow gms_sandbox self:tcp_socket { create connect };
+neverallow gms_sandbox self:udp_socket { create connect };
+
+# Prevenir acceso a datos del usuario (SDCard o particiones FBE)
+neverallow gms_sandbox media_rw_data_file:dir { read search };
+neverallow gms_sandbox system_data_file:dir { read search };
+
+# Unicamente puede interfaciar Binder consigo mismo o para devolver Mock Data al system_server
+allow gms_sandbox system_server:binder { call transfer };

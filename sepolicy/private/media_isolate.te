@@ -1,0 +1,16 @@
+# Demonio anfitrión que habla con pKVM
+type media_isolate, domain, coredomain;
+type media_isolate_exec, system_file_type, exec_type, file_type;
+
+init_daemon_domain(media_isolate)
+
+# Permisos para iniciar y destruir maquinas virtuales Android (Android Virtualization Framework)
+allow media_isolate virtualization_service:service_manager find;
+allow media_isolate virtmgr:binder { call transfer };
+
+# Impedir totalmente que obtenga capacidades heredadas (root, sys_admin)
+neverallow media_isolate self:capability { sys_admin dac_override setuid setgid net_admin };
+
+# No hay conexión UDP/TCP para parsers. Ningún atacante puede filtrar datos aunque alcance RCE en media_isolate.
+neverallow media_isolate self:tcp_socket *;
+neverallow media_isolate self:udp_socket *;
