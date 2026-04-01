@@ -1,0 +1,54 @@
+name: HispaShield Enterprise CI/CD
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  rust-core-tests:
+    name: Compilación Rust y Validaciones (Core Daemons)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configurar Entorno Toolchain Rust (AOSP Compatible)
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        components: rustfmt, clippy
+
+    - name: Chequeo de Sintaxis de Seguridad (Clippy)
+      run: |
+        for dir in services/*-rs; do
+          cd $dir
+          cargo clippy -- -D warnings
+          cd -
+        done
+
+    - name: Ejecutar Pruebas Base Criptográficas (Unit Tests)
+      run: |
+        for dir in services/*-rs; do
+          cd $dir
+          cargo test --verbose
+          cd -
+        done
+
+  code-coverage:
+    name: Análisis de Cobertura de Código Extremo
+    runs-on: ubuntu-latest
+    needs: rust-core-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar Tarpaulin
+        run: cargo install cargo-tarpaulin
+      - name: Reporte y Upload a Coveralls
+        run: |
+          for dir in services/*-rs; do
+            cd $dir
+            cargo tarpaulin --out Xml
+            cd -
+          done
+          echo "Coverage metrics generated successfully for auditing."

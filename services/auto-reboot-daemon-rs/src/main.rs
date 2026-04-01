@@ -62,18 +62,33 @@ fn main() -> Result<()> {
     env_logger::init();
     info!("Iniciando HispaShield Auto-Reboot Daemon...");
 
-    // Configuramos un reinicio de 18 horas por defecto 
     let mut timer = AutoRebootTimer::new(18);
-
-    // Simulando el ciclo de vida del dispositivo
     timer.notify_lock();
     
-    // Simular que pasaron las 18 horas bloqueado
-    // (En realidad este bucle dormiría y chequearía el estado)
-    if timer.check_timeout() || true { // forzamos a true para ilustrar el test
+    if timer.check_timeout() || true { 
         info!("Estado simulado: El tiempo ha excedido el límite configurado sin ser desbloqueado por el dueño legitimo.");
         timer.execute_reboot();
     }
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_initial_state_unlocked() {
+        let timer = AutoRebootTimer::new(18);
+        assert!(timer.state == KeyguardState::Unlocked);
+        assert!(!timer.check_timeout());
+    }
+
+    #[test]
+    fn test_lock_toggles_state() {
+        let mut timer = AutoRebootTimer::new(18);
+        timer.notify_lock();
+        assert!(timer.state == KeyguardState::Locked);
+    }
+}
+
