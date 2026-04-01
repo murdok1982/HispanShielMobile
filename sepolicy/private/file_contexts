@@ -1,0 +1,6 @@
+/system/bin/network_policy_daemon   u:object_r:network_policy_daemon_exec:s0
+/system/bin/sensor_guard            u:object_r:sensor_guard_exec:s0
+/system/bin/secure_settings_core    u:object_r:secure_settings_core_exec:s0
+
+# Directorio de persistencia aislado
+/data/system/secure_settings(/.*)?  u:object_r:secure_settings_data_file:s0

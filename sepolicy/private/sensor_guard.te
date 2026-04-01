@@ -1,0 +1,23 @@
+# domain definition for HispaShield sensor_guard
+type sensor_guard, domain, coredomain;
+type sensor_guard_exec, exec_type, file_type, system_file_type;
+
+init_daemon_domain(sensor_guard)
+
+# Drop absolutely all POSIX capabilities for Sensor Guard, runs entirely unprivileged at OS level
+neverallow sensor_guard self:capability *;
+
+# Allow binder IPC to communicate with the hardware HALs
+# binder_use(sensor_guard)
+# hal_client_domain(sensor_guard, hal_camera)
+# hal_client_domain(sensor_guard, hal_audio)
+# hal_client_domain(sensor_guard, hal_sensors)
+
+# Only SystemUI or system_server can toggle the kill-switch via binder
+# add_service(sensor_guard, sensor_guard_service)
+# allow system_server sensor_guard_service:service_manager find;
+# allow system_server sensor_guard:binder call;
+
+# Apps cannot talk to sensor_guard directly, they must go through the standard Android
+# SensorService which will internally be intercepted/routed by our architecture.
+neverallow untrusted_app_all sensor_guard:binder call;

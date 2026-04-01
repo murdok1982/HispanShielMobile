@@ -1,0 +1,24 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.hispashield.dashboard"
+    android:sharedUserId="android.uid.system"> <!-- Requiere firma de plataforma ROM -->
+
+    <!-- Permisos para ajustar sensores, políticas de red y leer estados seguros -->
+    <uses-permission android:name="android.permission.MANAGE_USERS" />
+    <uses-permission android:name="android.permission.MANAGE_SENSOR_PRIVACY" />
+    <uses-permission android:name="android.permission.CONNECTIVITY_INTERNAL" />
+    
+    <application
+        android:label="Centro de Privacidad"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.HispaShield">
+        
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

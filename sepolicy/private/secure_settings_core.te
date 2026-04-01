@@ -1,0 +1,21 @@
+# domain definition for HispaShield secure_settings_core
+type secure_settings_core, domain, coredomain;
+type secure_settings_core_exec, exec_type, file_type, system_file_type;
+
+init_daemon_domain(secure_settings_core)
+
+# Define a specific type for the encrypted settings data files
+type secure_settings_data_file, file_type, data_file_type, core_data_file_type;
+
+# Allow reading/writing to its own directory only
+allow secure_settings_core secure_settings_data_file:dir create_dir_perms;
+allow secure_settings_core secure_settings_data_file:file create_file_perms;
+
+# Allow communication with the Keystore/TEE for AES key derivation
+# hal_client_domain(secure_settings_core, hal_keymaster)
+allow secure_settings_core keystore:keystore_key { get_state get insert delete exist sign verify };
+allow secure_settings_core keystore:binder call;
+
+# Strictly enforce that no untrusted app can read these files directly
+neverallow { domain -secure_settings_core -init } secure_settings_data_file:dir *;
+neverallow { domain -secure_settings_core -init } secure_settings_data_file:file *;

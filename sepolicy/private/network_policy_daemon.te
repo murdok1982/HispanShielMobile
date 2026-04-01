@@ -1,0 +1,25 @@
+# domain definition for HispaShield network_policy_daemon
+type network_policy_daemon, domain, coredomain;
+type network_policy_daemon_exec, exec_type, file_type, system_file_type;
+
+# Initial domain transition
+init_daemon_domain(network_policy_daemon)
+
+# Drop all bounding capabilities except net_admin and bpf
+allow network_policy_daemon self:capability { net_admin net_raw dac_override };
+
+# Allow interaction with BPF maps and netlink sockets
+allow network_policy_daemon fs_bpf:dir search;
+allow network_policy_daemon fs_bpf:file { read write open getattr };
+allow network_policy_daemon self:netlink_route_socket create_socket_perms_no_ioctl;
+allow network_policy_daemon self:netlink_kobject_uevent_socket create_socket_perms_no_ioctl;
+
+# Deny interaction with untrusted apps directly
+neverallow network_policy_daemon untrusted_app_all:process ptrace;
+neverallow untrusted_app_all network_policy_daemon:binder call;
+
+# Only allow system_server to call NetworkPolicyDaemon via binder
+# binder_use(network_policy_daemon)
+# add_service(network_policy_daemon, network_policy_service)
+# allow system_server network_policy_service:service_manager find;
+# allow system_server network_policy_daemon:binder call;
