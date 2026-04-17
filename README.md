@@ -1,8 +1,98 @@
 <div align="center">
-  <img src="docs/logo.png" alt="HispaShield Mobile Logo" width="300"/>
-  <h1>HispaShield Mobile</h1>
+  <img src="docs/logo.png" alt="HispaShield Mobile Logo" width="350"/>
+  <br/>
+  <h1>🛡️ HispaShield Mobile OS</h1>
   <p><strong>Sistema Operativo Móvil Enfocado en la Privacidad Defensiva / Defensive Privacy Mobile OS</strong></p>
+
+  [![Rust](https://img.shields.io/badge/Rust-Memory%20Safe-orange.svg?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
+  [![AOSP](https://img.shields.io/badge/AOSP-Based-green.svg?style=for-the-badge&logo=android)](https://source.android.com/)
+  [![SELinux](https://img.shields.io/badge/SELinux-Enforcing-blue.svg?style=for-the-badge)](https://selinuxproject.org/)
+  [![License](https://img.shields.io/badge/License-MIT-purple.svg?style=for-the-badge)](LICENSE)
 </div>
+
+<br/>
+
+## 🧭 System Architecture & Ecosystem
+
+```mermaid
+mindmap
+  root((HispaShield Mobile))
+    Core System
+        Hardened AOSP Base
+        Upstream Kernel Patches
+        Minimal Attack Surface
+    Rust Safety Daemons
+        Network Policy Daemon
+        Sensor Guard
+        Secure Settings Core
+        Profile Isolation
+    Hardware Trust
+        Android Verified Boot AVB
+        Titan M2 Integration
+        Hardware-Backed Keystore
+    Exploit Mitigation
+        SELinux Strict Enforcing
+        Seccomp BPF Filters
+        Rust Memory Safety
+```
+
+<br/>
+
+## 🏗️ Components & Data Flow Diagram
+
+```mermaid
+graph TD
+    %% Define styles
+    classDef user fill:#1e1e1e,stroke:#3ddc84,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef rust fill:#b7410e,stroke:#333,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef aosp fill:#3ddc84,stroke:#333,stroke-width:2px,color:#111,rx:5px,ry:5px
+    classDef hw fill:#555,stroke:#f1c40f,stroke-width:2px,color:#fff,rx:5px,ry:5px
+
+    %% Components
+    UserApp["📱 User / Sandbox Apps"]:::user
+    
+    subgraph AOSP Framework Layer
+        Permissions["Permission Controller"]:::aosp
+        Services["Android System Services"]:::aosp
+    end
+
+    subgraph HispaShield Core Services
+        NPD["Network Policy Daemon (Rust)"]:::rust
+        SG["Sensor Guard (Rust)"]:::rust
+        SSC["Secure Settings Core (Rust)"]:::rust
+        PI["Profile Isolation (Rust)"]:::rust
+        GMS["GMS Compat Proxy (Rust)"]:::rust
+    end
+
+    subgraph OS Kernel Layer
+        SELinux["🛡️ SELinux (Default Deny)"]:::aosp
+        Seccomp["🔒 Seccomp-bpf Filters"]:::aosp
+    end
+
+    subgraph Secure Hardware
+        AVB["Verified Boot (AVB)"]:::hw
+        Titan["Titan M2 / Secure Enclave"]:::hw
+    end
+
+    %% Routing
+    UserApp -->|Interacts| Services
+    UserApp -.->|Network Traffic| NPD
+    UserApp -.->|Hardware Access| SG
+    
+    Services --> Permissions
+    Permissions --> SSC
+    Services --> GMS
+    PI --> UserApp
+    
+    NPD --> SELinux
+    SG --> Seccomp
+    SSC --> Seccomp
+    
+    SELinux --> AVB
+    Seccomp --> Titan
+```
+
+<br/>
 
 ---
 
@@ -10,7 +100,7 @@
 
 **HispaShield Mobile** es un sistema operativo móvil de grado de producción, centrado en la privacidad extrema y diseñado bajo los principios de aislamiento, mínimo privilegio y mitigación de exploits. Basado en un núcleo endurecido de AOSP, reemplaza los servicios críticos con demonios escritos en **Rust** (seguros a nivel de memoria) e impone controles de acceso obligatorios drásticos utilizando **SELinux**.
 
-### Características Principales
+### ✨ Características Principales
 *   **Aislamiento y Sandboxing Fuerte:** Separación estricta de perfiles y restricciones drásticas de red (`Default Deny`).
 *   **Demonios Críticos en Rust:** Componentes nativos seguros contra vulnerabilidades de memoria (`Network Policy Daemon`, `Sensor Guard`, `Secure Settings Core`).
 *   **Seguridad Defensiva y Transparencia:** Diseñado exclusivamente para proteger al usuario local. Sin utilidades ofensivas, telemetría ni puertas traseras.
@@ -47,37 +137,11 @@
 
 ---
 
-### 💰 Apoya mi trabajo de código abierto
-
-Si este proyecto te ha sido útil, considera apoyarlo financieramente para mantener activo su desarrollo.
-
-**Bitcoin**
-
-```text
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃  ₿  Bitcoin Donation Address  ₿   ┃
-┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-┃                                   ┃
-┃   bc1qqphwht25vjzlptwzjyjt3sex    ┃
-┃   7e3p8twn390fkw                  ┃
-┃                                   ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-```
-
-**Red:** Bitcoin (BTC)  
-**Dirección:** `bc1qqphwht25vjzlptwzjyjt3sex7e3p8twn390fkw`
-
-*Escanee el código QR.*
-**¡Vuestro apoyo me ayuda a dedicar más tiempo al desarrollo de código abierto! 🙏**
-
----
-<br />
-
 ## 🇬🇧 English
 
 **HispaShield Mobile** is a production-grade, privacy-centric mobile operating system designed around principles of strict isolation, least privilege, and exploit mitigation. Built upon a hardened AOSP foundation, it replaces critical services with memory-safe **Rust** daemons and enforces draconian mandatory access controls via **SELinux**.
 
-### Core Features
+### ✨ Core Features
 *   **Strong Compartmentalization:** Strict profile separation and default-deny network controls.
 *   **Critical Daemons in Rust:** Memory-safe native components (`Network Policy Daemon`, `Sensor Guard`, `Secure Settings Core`).
 *   **Defensive Security & Transparency:** Exclusively designed to protect the local user. Zero offensive tools, zero telemetry, no backdoors.
@@ -113,11 +177,12 @@ Si este proyecto te ha sido útil, considera apoyarlo financieramente para mante
 
 ---
 
-### 💰 Support my open-source work
+### 💰 Support my open-source work | Apoya mi trabajo de código abierto
 
-If you find this project useful, consider supporting it financially to help me dedicate more time to active open-source development.
+If you find this project useful, consider supporting it financially to help me dedicate more time to active open-source development.  
+*Si este proyecto te ha sido útil, considera apoyarlo financieramente para mantener activo su desarrollo.*
 
-**Bitcoin**
+**Bitcoin Donation**
 
 ```text
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
@@ -130,8 +195,8 @@ If you find this project useful, consider supporting it financially to help me d
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 ```
 
-**Network:** Bitcoin (BTC)  
-**Address:** `bc1qqphwht25vjzlptwzjyjt3sex7e3p8twn390fkw`
+**Network / Red:** Bitcoin (BTC)  
+**Address / Dirección:** `bc1qqphwht25vjzlptwzjyjt3sex7e3p8twn390fkw`
 
-*Scan the QR code.*
-**Your support helps me dedicate more time to open-source development! 🙏**
+**Your support helps me dedicate more time to open-source development! 🙏**  
+**¡Vuestro apoyo me ayuda a dedicar más tiempo al desarrollo de código abierto! 🙏**
