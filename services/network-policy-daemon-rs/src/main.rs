@@ -1,54 +1,66 @@
-use anyhow::Result;
-use log::{info, error};
-use std::collections::HashMap;
+mod policy;
+mod socket;
 
-/// Represents an application's network policy state.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct AppNetworkPolicy {
-    uid: u32,
-    background_data_allowed: bool,
-    vpn_lockdown_bypass: bool,
-}
+use anyhow::Context;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tracing::{error, info};
 
-/// A mock BPF/iptables backend controller interface.
-struct FirewallController {
-    policies: HashMap<u32, AppNetworkPolicy>,
-}
+const SOCKET_PATH: &str = "/run/hispashield/npd.sock";
+const POLICY_FILE: &str = "/data/hispashield/npd_rules.json";
+const RELOAD_INTERVAL_SECS: u64 = 60;
 
-impl FirewallController {
-    fn new() -> Self {
-        Self {
-            policies: HashMap::new(),
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // Initialize structured logging
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("network_policy_daemon=debug".parse().unwrap()),
+        )
+        .json()
+        .init();
+
+    info!("HispaShield Network Policy Daemon starting");
+
+    // Load initial policy — if file missing, start with empty (deny-all by default)
+    let engine = match policy::PolicyEngine::load_from_file(POLICY_FILE) {
+        Ok(e) => {
+            info!(rules = e.rule_count(), "Policy loaded successfully");
+            e
         }
-    }
-
-    /// Enforces the policy via BPF maps or iptables wrapper.
-    fn apply_policy(&mut self, policy: AppNetworkPolicy) -> Result<()> {
-        info!("Applying strict network policy for UID {}: BgData: {}, VpnBypass: {}", 
-               policy.uid, policy.background_data_allowed, policy.vpn_lockdown_bypass);
-        self.policies.insert(policy.uid, policy);
-        Ok(())
-    }
-}
-
-fn main() -> Result<()> {
-    std::env::set_var("RUST_LOG", "info");
-    env_logger::init();
-    info!("Starting HispaShield Network Policy Daemon...");
-
-    let mut firewall = FirewallController::new();
-
-    // Default deny policy for a newly installed app
-    let new_app_policy = AppNetworkPolicy {
-        uid: 10050,
-        background_data_allowed: false, // Default deny
-        vpn_lockdown_bypass: false,
+        Err(err) => {
+            error!(%err, "Could not load policy file, starting with empty (default-deny) policy");
+            policy::PolicyEngine::new()
+        }
     };
 
-    if let Err(e) = firewall.apply_policy(new_app_policy) {
-        error!("Failed to apply network policy: {}", e);
-    }
+    let engine = Arc::new(RwLock::new(engine));
 
-    info!("Network policy daemon is running and strictly enforcing default-deny rules.");
+    // Spawn background task that reloads policy periodically
+    let engine_reload = Arc::clone(&engine);
+    tokio::spawn(async move {
+        let mut interval =
+            tokio::time::interval(std::time::Duration::from_secs(RELOAD_INTERVAL_SECS));
+        loop {
+            interval.tick().await;
+            match policy::PolicyEngine::load_from_file(POLICY_FILE) {
+                Ok(new_engine) => {
+                    let count = new_engine.rule_count();
+                    let mut guard = engine_reload.write().await;
+                    *guard = new_engine;
+                    info!(rules = count, "Policy reloaded");
+                }
+                Err(err) => {
+                    error!(%err, "Policy reload failed, keeping existing rules");
+                }
+            }
+        }
+    });
+
+    // Run the Unix socket server (blocks until error)
+    let server = socket::SocketServer::new(SOCKET_PATH, Arc::clone(&engine));
+    server.run().await.context("Socket server terminated")?;
+
     Ok(())
 }
