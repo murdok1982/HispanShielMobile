@@ -1,0 +1,84 @@
+# HispaShield Sensor Guard — SELinux Type Enforcement
+
+##############################################################################
+# Type declarations
+##############################################################################
+type hispashield_sensorguard, domain;
+type hispashield_sensorguard_exec, exec_type, vendor_file_type, file_type;
+type hispashield_sensorguard_socket, file_type;
+type hispashield_sensorguard_data_file, file_type, data_file_type;
+
+##############################################################################
+# Domain transition
+##############################################################################
+init_daemon_domain(hispashield_sensorguard)
+
+##############################################################################
+# Self permissions
+##############################################################################
+allow hispashield_sensorguard self:capability { dac_override dac_read_search };
+allow hispashield_sensorguard self:process { fork signal sigchld };
+allow hispashield_sensorguard self:fifo_file rw_file_perms;
+allow hispashield_sensorguard self:unix_stream_socket { create_socket_perms listen accept };
+
+##############################################################################
+# Sensor hardware access (HAL mediation)
+##############################################################################
+
+# IMU sensors (/dev/iio:device* or via sensor HAL Binder IPC)
+allow hispashield_sensorguard sysfs_iio:dir { read search };
+allow hispashield_sensorguard sysfs_iio:file { read open getattr };
+
+# GPS (location HAL)
+allow hispashield_sensorguard hal_gnss_hwservice:hwservice_manager find;
+allow hispashield_sensorguard hal_gnss:binder { call transfer };
+
+# Camera sensor (for access-check interception — NOT direct camera frames)
+allow hispashield_sensorguard hal_camera_hwservice:hwservice_manager find;
+
+# Microphone (for access-check interception via audio HAL)
+allow hispashield_sensorguard hal_audio_hwservice:hwservice_manager find;
+
+# Barometer / pressure sensor
+allow hispashield_sensorguard sysfs_iio:file { read open getattr };
+
+##############################################################################
+# Unix domain socket at /run/hispashield/sensorguard.sock
+##############################################################################
+allow hispashield_sensorguard hispashield_sensorguard_socket:sock_file { create setattr read write unlink };
+allow hispashield_sensorguard hispashield_sensorguard_socket:dir { create setattr read write add_name remove_name search };
+
+allow { system_server platform_app priv_app untrusted_app }
+    hispashield_sensorguard_socket:sock_file write;
+allow { system_server platform_app priv_app untrusted_app }
+    hispashield_sensorguard:unix_stream_socket connectto;
+
+##############################################################################
+# Permissions data file
+##############################################################################
+allow hispashield_sensorguard hispashield_sensorguard_data_file:dir { create read write add_name remove_name search };
+allow hispashield_sensorguard hispashield_sensorguard_data_file:file { create read write open getattr setattr };
+
+##############################################################################
+# Logging
+##############################################################################
+allow hispashield_sensorguard log_device:chr_file rw_file_perms;
+
+##############################################################################
+# EXPLICIT DENIALS
+##############################################################################
+
+# Sensor guard MUST NOT have network access
+neverallow hispashield_sensorguard self:tcp_socket { create open };
+neverallow hispashield_sensorguard self:udp_socket { create open };
+neverallow hispashield_sensorguard port:tcp_socket { name_connect };
+
+# Cannot read user app data
+neverallow hispashield_sensorguard app_data_file:file { read open };
+
+# Cannot write to camera or audio device directly
+neverallow hispashield_sensorguard camera_device:chr_file { write ioctl };
+neverallow hispashield_sensorguard audio_device:chr_file { write ioctl };
+
+# Cannot load kernel modules
+neverallow hispashield_sensorguard self:capability sys_module;
