@@ -1,103 +1,202 @@
-use anyhow::Result;
-use log::{info, warn};
-use std::collections::HashMap;
+mod profile;
 
-/// Modela los tipos de perfiles en el dispositivo.
-#[derive(Debug, PartialEq, Clone, Copy)]
-enum ProfileType {
-    Standard,     // Perfil maestro o diario
-    Sensitive,    // Perfil oculto/seguro (ej. Periodista/Trabajo)
+use anyhow::Context;
+use profile::{IsolationPolicy, Profile, ProfileKind, ProfileManager};
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::{UnixListener, UnixStream};
+use tokio::sync::Mutex;
+use tracing::{error, info, warn};
+
+const SOCKET_PATH: &str = "/run/hispashield/profileisolation.sock";
+const CONFIG_FILE: &str = "/data/hispashield/profile_config.json";
+const MOUNTS_POLL_INTERVAL_SECS: u64 = 30;
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "op", rename_all = "snake_case")]
+enum IsolationRequest {
+    CheckAccess { uid: u32, path: String },
+    ListProfiles,
 }
 
-/// Estado criptográfico de un perfil.
-#[derive(Debug, PartialEq)]
-enum KeyState {
-    Evicted,      // Claves borradas de la RAM (Inaccesible y Seguro)
-    Decrypted,    // FBE desbloqueado (En uso)
+#[derive(Debug, Serialize)]
+struct IsolationResponse {
+    allowed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    profiles: Option<Vec<String>>,
 }
 
-struct UserProfile {
-    id: u32,
-    p_type: ProfileType,
-    key_state: KeyState,
-}
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("profile_isolation=debug".parse().unwrap()),
+        )
+        .json()
+        .init();
 
-struct ProfileIsolationManager {
-    profiles: HashMap<u32, UserProfile>,
-    active_profile: u32,
-}
+    info!("HispaShield Profile Isolation starting");
 
-impl ProfileIsolationManager {
-    fn new() -> Self {
-        let mut profiles = HashMap::new();
-        // Insertando el perfil principal público
-        profiles.insert(0, UserProfile {
-            id: 0,
-            p_type: ProfileType::Standard,
-            key_state: KeyState::Evicted,
-        });
-        
-        Self {
-            profiles,
-            active_profile: 0,
+    let mut manager = match profile::ProfileManager::load_from_file(CONFIG_FILE) {
+        Ok(m) => {
+            info!(count = m.profile_count(), "Profile config loaded");
+            m
+        }
+        Err(e) => {
+            warn!("Could not load profile config ({}), using built-in defaults", e);
+            build_default_manager()
+        }
+    };
+
+    let manager = Arc::new(Mutex::new(manager));
+
+    // Spawn a task that periodically checks /proc/mounts for unexpected bind-mounts
+    let manager_monitor = Arc::clone(&manager);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(
+            std::time::Duration::from_secs(MOUNTS_POLL_INTERVAL_SECS),
+        );
+        loop {
+            interval.tick().await;
+            monitor_mounts(&manager_monitor).await;
+        }
+    });
+
+    let path = Path::new(SOCKET_PATH);
+    if path.exists() {
+        std::fs::remove_file(path)?;
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let listener = UnixListener::bind(path).context("Failed to bind profile-isolation socket")?;
+    info!(socket = SOCKET_PATH, "Profile isolation daemon listening");
+
+    loop {
+        match listener.accept().await {
+            Ok((stream, _)) => {
+                let manager = Arc::clone(&manager);
+                tokio::spawn(async move {
+                    if let Err(e) = handle_client(stream, manager).await {
+                        error!("Client error: {}", e);
+                    }
+                });
+            }
+            Err(e) => error!("Accept error: {}", e),
         }
     }
+}
 
-    fn create_sensitive_profile(&mut self, profile_id: u32) {
-        info!("Creando un nuevo perfil de tipo Sensible (Multi-User) con ID: {}", profile_id);
-        self.profiles.insert(profile_id, UserProfile {
-            id: profile_id,
-            p_type: ProfileType::Sensitive,
-            key_state: KeyState::Evicted,
-        });
-    }
+async fn handle_client(
+    stream: UnixStream,
+    manager: Arc<Mutex<ProfileManager>>,
+) -> anyhow::Result<()> {
+    let (reader, mut writer) = stream.into_split();
+    let mut lines = BufReader::new(reader).lines();
 
-    /// Lógica central contra la extorsión física:
-    /// Si el usuario ingresa a un perfil, los perfiles sensibles paralelos se DESTRUYEN en RAM
-    /// (se expulsan las claves del TEE) para imposibilitar su extracción forense en caliente.
-    fn switch_active_profile(&mut self, new_profile_id: u32) -> Result<()> {
-        info!("Petición de cambio de perfil al ID: {}", new_profile_id);
-        
-        if self.active_profile != new_profile_id {
-            // Expulsar claves de todos los demás perfiles sensibles si se sale de ellos
-            for (id, profile) in self.profiles.iter_mut() {
-                if *id != new_profile_id && profile.p_type == ProfileType::Sensitive {
-                    if profile.key_state == KeyState::Decrypted {
-                        warn!("Protección Anti-Extorsión (Aislamiento): Purgando claves del perfil sensible ID {} en RAM.", id);
-                        // Mocking la syscall de vold para expulsar llaves FBE
-                        profile.key_state = KeyState::Evicted;
-                        info!("Perfil {} ahora alojado estáticamente y de forma segura como datos cifrados incomprensibles.", id);
+    while let Some(line) = lines.next_line().await? {
+        let line = line.trim().to_string();
+        if line.is_empty() {
+            continue;
+        }
+
+        let response: IsolationResponse = match serde_json::from_str::<IsolationRequest>(&line) {
+            Err(e) => {
+                warn!("Parse error: {}", e);
+                IsolationResponse { allowed: false, reason: Some(format!("parse error: {}", e)), profiles: None }
+            }
+            Ok(req) => {
+                let mgr = manager.lock().await;
+                match req {
+                    IsolationRequest::CheckAccess { uid, path } => {
+                        match mgr.check_path_access(uid, &path) {
+                            Ok(()) => IsolationResponse { allowed: true, reason: None, profiles: None },
+                            Err(e) => IsolationResponse {
+                                allowed: false,
+                                reason: Some(e.to_string()),
+                                profiles: None,
+                            },
+                        }
+                    }
+                    IsolationRequest::ListProfiles => {
+                        let names = mgr.profile_names();
+                        IsolationResponse { allowed: true, reason: None, profiles: Some(names) }
                     }
                 }
             }
-        }
-        
-        self.active_profile = new_profile_id;
-        
-        if let Some(profile) = self.profiles.get_mut(&new_profile_id) {
-            profile.key_state = KeyState::Decrypted;
-            info!("Perfil {} ahora está Activo y sus claves desencriptadas (En uso legitimo).", new_profile_id);
-        }
+        };
 
-        Ok(())
+        let mut json = serde_json::to_string(&response)?;
+        json.push('\n');
+        writer.write_all(json.as_bytes()).await?;
+    }
+    Ok(())
+}
+
+async fn monitor_mounts(manager: &Arc<Mutex<ProfileManager>>) {
+    // Read /proc/mounts and check for unexpected bind-mounts that cross profile boundaries
+    let content = match tokio::fs::read_to_string("/proc/mounts").await {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+
+    let mgr = manager.lock().await;
+    for line in content.lines() {
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        if fields.len() < 4 {
+            continue;
+        }
+        let mount_point = fields[1];
+        let options = fields[3];
+        // Detect bind mounts that cross profile data roots
+        if options.contains("bind") {
+            let source = fields[0];
+            let source_profile = mgr.profile_for_path(source);
+            let dest_profile = mgr.profile_for_path(mount_point);
+            if let (Some(sp), Some(dp)) = (source_profile, dest_profile) {
+                if sp.id != dp.id {
+                    warn!(
+                        source,
+                        mount_point,
+                        source_profile = %sp.id,
+                        dest_profile = %dp.id,
+                        "ALERT: Cross-profile bind-mount detected!"
+                    );
+                }
+            }
+        }
     }
 }
 
-fn main() -> Result<()> {
-    std::env::set_var("RUST_LOG", "info,warn");
-    env_logger::init();
-    info!("Iniciando HispaShield Profile Isolation Manager...");
-
-    let mut manager = ProfileIsolationManager::new();
-    
-    // Usuario configura su perfil "secreto" de trabajo (ID 10)
-    let secret_profile_id = 10;
-    manager.create_sensitive_profile(secret_profile_id);
-
-    // Simular que el usuario es forzado a dar su PIN principal (Perfil 0) 
-    // bajo coacción física. El sistema cambiará al Perfil 0 y "evict" (destruirá en RAM) el Perfil 10.
-    info!("Simulación: Dispositivo desbloqueado bajo coacción con el PIN del perfil principal.");
-    manager.switch_active_profile(0)?;
-
-    Ok(())
+fn build_default_manager() -> ProfileManager {
+    let policy = IsolationPolicy::default();
+    let mut mgr = ProfileManager::new(policy);
+    mgr.add_profile(Profile {
+        id: "personal".into(),
+        kind: ProfileKind::Personal,
+        data_root: PathBuf::from("/data/user/0"),
+        uid_range_start: 10000,
+        uid_range_end: 19999,
+    });
+    mgr.add_profile(Profile {
+        id: "work".into(),
+        kind: ProfileKind::Work,
+        data_root: PathBuf::from("/data/user/10"),
+        uid_range_start: 1010000,
+        uid_range_end: 1019999,
+    });
+    mgr.add_profile(Profile {
+        id: "guest".into(),
+        kind: ProfileKind::Guest,
+        data_root: PathBuf::from("/data/user/11"),
+        uid_range_start: 1110000,
+        uid_range_end: 1119999,
+    });
+    mgr
 }
