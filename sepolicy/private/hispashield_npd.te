@@ -1,0 +1,106 @@
+# HispaShield Network Policy Daemon (NPD) — SELinux Type Enforcement
+# Target: AOSP 14+ / Android common kernel 6.1+
+
+##############################################################################
+# Type declarations
+##############################################################################
+
+# Domain type for the running daemon process
+type hispashield_npd, domain;
+
+# File type for the daemon executable on /system or /vendor
+type hispashield_npd_exec, exec_type, vendor_file_type, file_type;
+
+# Unix socket type in /run/hispashield/
+type hispashield_npd_socket, file_type;
+
+# Policy data files in /data/hispashield/
+type hispashield_npd_data_file, file_type, data_file_type;
+
+##############################################################################
+# Domain transition: init -> hispashield_npd on exec of hispashield_npd_exec
+##############################################################################
+init_daemon_domain(hispashield_npd)
+
+##############################################################################
+# Self permissions
+##############################################################################
+allow hispashield_npd self:capability { dac_override dac_read_search setuid setgid };
+allow hispashield_npd self:process { fork signal sigchld sigkill sigstop getsched setsched };
+allow hispashield_npd self:fifo_file rw_file_perms;
+allow hispashield_npd self:unix_stream_socket { create_socket_perms listen accept };
+allow hispashield_npd self:netlink_socket { create_socket_perms };
+allow hispashield_npd self:netlink_route_socket { create_socket_perms nlmsg_read nlmsg_write };
+
+##############################################################################
+# Network access
+##############################################################################
+# Allow TCP/UDP sockets to monitor policy decisions (not to initiate connections)
+allow hispashield_npd self:tcp_socket { create bind listen accept read write shutdown };
+allow hispashield_npd self:udp_socket { create bind read write };
+
+# Allow reading routing table via netlink
+allow hispashield_npd self:netlink_route_socket nlmsg_read;
+
+# Allow access to /proc/net for connection tracking
+allow hispashield_npd proc_net:file r_file_perms;
+
+##############################################################################
+# Unix domain socket at /run/hispashield/npd.sock
+##############################################################################
+allow hispashield_npd hispashield_npd_socket:sock_file { create setattr read write unlink };
+allow hispashield_npd hispashield_npd_socket:dir { create setattr read write add_name remove_name search };
+
+# Allow other system domains to connect to NPD socket
+allow { system_server platform_app priv_app untrusted_app } hispashield_npd_socket:sock_file write;
+allow { system_server platform_app priv_app untrusted_app } hispashield_npd:unix_stream_socket connectto;
+
+##############################################################################
+# Policy data files: /data/hispashield/npd_rules.json
+##############################################################################
+allow hispashield_npd hispashield_npd_data_file:dir { create read write add_name remove_name search };
+allow hispashield_npd hispashield_npd_data_file:file { create read write open getattr setattr rename unlink };
+
+# Allow reading a tmp file for atomic write
+allow hispashield_npd hispashield_npd_data_file:file { create open write rename unlink getattr };
+
+##############################################################################
+# Logging
+##############################################################################
+allow hispashield_npd kmsg_device:chr_file rw_file_perms;
+allow hispashield_npd log_device:chr_file rw_file_perms;
+
+##############################################################################
+# System resources
+##############################################################################
+# /proc/self
+allow hispashield_npd proc:file r_file_perms;
+allow hispashield_npd proc_stat:file r_file_perms;
+
+# Clock
+allow hispashield_npd self:capability sys_time;
+
+##############################################################################
+# EXPLICIT DENIALS — belt-and-suspenders on top of default deny
+##############################################################################
+
+# No access to user credential storage
+neverallow hispashield_npd credstore_data_file:file { read write open };
+
+# No access to camera or microphone device nodes
+neverallow hispashield_npd camera_device:chr_file { read write open ioctl };
+neverallow hispashield_npd audio_device:chr_file { write open ioctl };
+
+# No access to /data/data (app-private storage)
+neverallow hispashield_npd app_data_file:dir { read search };
+neverallow hispashield_npd app_data_file:file { read open };
+
+# No access to external storage
+neverallow hispashield_npd { sdcard_type media_rw_data_file }:file { read write };
+
+# Cannot execute arbitrary binaries
+neverallow hispashield_npd { exec_type -hispashield_npd_exec }:file execute;
+neverallow hispashield_npd { exec_type -hispashield_npd_exec }:file execute_no_trans;
+
+# Cannot load kernel modules
+neverallow hispashield_npd self:capability sys_module;
