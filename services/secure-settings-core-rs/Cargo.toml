@@ -3,11 +3,16 @@ name = "secure-settings-core"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "secure-settings-core"
+path = "src/main.rs"
+
 [dependencies]
-log = "0.4"
-env_logger = "0.10"
-anyhow = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-aes-gcm = "0.10"
-rand = "0.8"
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+nix = { workspace = true }
