@@ -1,45 +1,85 @@
-use anyhow::Result;
-use log::{info, warn};
+mod proxy;
 
-/// Interfaz Emulada de los Servicios de Geolocalización GMS
-struct GmsLocationProxy {}
+use anyhow::Context;
+use proxy::{EndpointFilter, GmsProxy, GmsRequest};
+use std::path::Path;
+use std::sync::Arc;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::{UnixListener, UnixStream};
+use tracing::{error, info, warn};
 
-impl GmsLocationProxy {
-    /// Responde a la app cliente (ej: Uber) dándole la ubicación mediante la HAL nativa
-    /// sin contactar a los servidores de mapeo de Google y enviando un ID falso.
-    fn get_last_location(&self) -> String {
-        info!("App cliente solicitó FusedLocationProvider de GMS.");
-        warn!("GMS-Compat: Interceptando llamada. Derivando petición a la API de AOSP Local (Pure GPS).");
-        "{\"lat\": 40.4168, \"lng\": -3.7038, \"provider\": \"pseudonymous-gps\"}".to_string()
+const SOCKET_PATH: &str = "/run/hispashield/gmscompat.sock";
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("gms_compat_proxy=debug".parse().unwrap()),
+        )
+        .json()
+        .init();
+
+    info!("HispaShield GMS Compat Proxy starting");
+
+    let proxy = Arc::new(GmsProxy::new(EndpointFilter::default_production()));
+
+    let path = Path::new(SOCKET_PATH);
+    if path.exists() {
+        std::fs::remove_file(path)?;
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let listener = UnixListener::bind(path).context("Failed to bind GMS compat socket")?;
+    info!(socket = SOCKET_PATH, "GMS proxy listening");
+
+    loop {
+        match listener.accept().await {
+            Ok((stream, _)) => {
+                let proxy = Arc::clone(&proxy);
+                tokio::spawn(async move {
+                    if let Err(e) = handle_client(stream, proxy).await {
+                        error!("Client error: {}", e);
+                    }
+                });
+            }
+            Err(e) => error!("Accept error: {}", e),
+        }
     }
 }
 
-/// Interfaz Emulada de Firebase Analytics (Telemetría de Google)
-struct FirebaseProxy {}
+async fn handle_client(
+    stream: UnixStream,
+    proxy: Arc<GmsProxy>,
+) -> anyhow::Result<()> {
+    let (reader, mut writer) = stream.into_split();
+    let mut lines = BufReader::new(reader).lines();
 
-impl FirebaseProxy {
-    /// Responde con estado 'Éxito' a la app cliente, pero destruye agresivamente los datos
-    /// en RAM para que jamás salgan de la red local del dispositivo. (Red Ciega).
-    fn mock_send_analytics(&self, _event_data: &str) {
-        info!("GMS-Compat: App intentando emitir telemetría comercial a Firebase/Google Analytics...");
-        warn!("Protección Blackhole: Payload '{_}' destruida sin red local. Reportando 'StatusCode 200 OK' falso a la app cliente.");
+    while let Some(line) = lines.next_line().await? {
+        let line = line.trim().to_string();
+        if line.is_empty() {
+            continue;
+        }
+
+        let response = match serde_json::from_str::<GmsRequest>(&line) {
+            Err(e) => {
+                warn!("Failed to parse GMS request: {}", e);
+                serde_json::json!({
+                    "allowed": false,
+                    "reason": format!("parse error: {}", e)
+                })
+            }
+            Ok(req) => {
+                let resp = proxy.process_request(req);
+                serde_json::to_value(&resp)?
+            }
+        };
+
+        let mut json = serde_json::to_string(&response)?;
+        json.push('\n');
+        writer.write_all(json.as_bytes()).await?;
     }
-}
-
-fn main() -> Result<()> {
-    std::env::set_var("RUST_LOG", "info,warn");
-    env_logger::init();
-    info!("Iniciando HispaShield GMS Compatibility Sandbox (Capa Ciega)...");
-
-    let location_mock = GmsLocationProxy {};
-    let analytics_mock = FirebaseProxy {};
-
-    // App pide ubicación
-    let secure_loc = location_mock.get_last_location();
-    info!("App recibió: {}", secure_loc);
-
-    // App intenta enviar datos de seguimiento de usuario encubiertos mediante rastreadores GMS:
-    analytics_mock.mock_send_analytics("user_id=10293&event=app_open&device=pixel8");
-
     Ok(())
 }
