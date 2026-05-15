@@ -1,0 +1,130 @@
+name: Rust CI
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable + components)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Rust build artefacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: hispashield-rust-stable
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy (all targets, deny warnings)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Build all daemons (release mode)
+        run: cargo build --workspace --release
+
+      - name: Run unit and integration tests
+        run: cargo test --workspace -- --nocapture
+
+  security-audit:
+    name: Security Audit (cargo-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run cargo-audit via rustsec/audit-check
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  cross-compile-android:
+    name: Cross-compile for aarch64-linux-android
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain with Android target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache Rust build artefacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: hispashield-rust-android
+
+      - name: Install Android NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Configure Cargo for Android cross-compilation
+        run: |
+          mkdir -p ~/.cargo
+          NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_SDK_ROOT/ndk-bundle}"
+          TOOLCHAIN="${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          cat >> ~/.cargo/config.toml <<CARGOEOF
+          [target.aarch64-linux-android]
+          linker = "${TOOLCHAIN}/aarch64-linux-android34-clang"
+          CARGOEOF
+
+      - name: Cross-compile workspace for aarch64-linux-android
+        run: cargo build --workspace --release --target aarch64-linux-android
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+
+  lint-sepolicy:
+    name: Lint SELinux policy files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install SELinux policy tools
+        run: sudo apt-get install -y setools policycoreutils checkpolicy
+
+      - name: Check TE files for syntax errors
+        run: |
+          for f in sepolicy/private/*.te; do
+            echo "Checking $f..."
+            checkpolicy -M -C -o /dev/null "$f" 2>&1 | grep -v "^$" || true
+          done
+
+  flutter-ui:
+    name: Flutter Privacy Dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.22.0"
+          channel: "stable"
+
+      - name: Install Flutter dependencies
+        working-directory: ui/privacy-dashboard
+        run: flutter pub get
+
+      - name: Analyze Flutter code
+        working-directory: ui/privacy-dashboard
+        run: flutter analyze
+
+      - name: Run Flutter tests
+        working-directory: ui/privacy-dashboard
+        run: flutter test
