@@ -9,6 +9,9 @@ members = [
     "services/auto-reboot-daemon-rs",
     "services/baseband-proxy-hal-rs",
     "services/media-isolate-coordinator-rs",
+    "services/duress-pin-daemon-rs",
+    "services/deadman-switch-rs",
+    "services/baseband-firmware-guard-rs",
 ]
 
 [workspace.dependencies]
@@ -20,3 +23,6 @@ serde_json = "1"
 thiserror = "1"
 anyhow = "1"
 nix = { version = "0.29", features = ["socket", "uio", "fs", "signal", "process", "reboot"] }
+sha2 = "0.10"
+hex = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
