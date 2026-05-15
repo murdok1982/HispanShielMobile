@@ -1,0 +1,37 @@
+name: privacy_dashboard
+description: HispaShield Privacy Dashboard — real-time security status UI
+version: 1.0.0+1
+publish_to: none
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Material 3 icon set
+  material_design_icons_flutter: ^7.0.7296
+  # HTTP / IPC communication
+  http: ^1.2.0
+  # State management
+  provider: ^6.1.2
+  # Charts for audit log visualisation
+  fl_chart: ^0.68.0
+  # Shared preferences (local settings)
+  shared_preferences: ^2.2.3
+  # Riverpod alternative — keeping provider for simplicity
+  # Date/time formatting
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  mockito: ^5.4.4
+  build_runner: ^2.4.9
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/
