@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    # Original 8 daemons
     "services/network-policy-daemon-rs",
     "services/sensor-guard-rs",
     "services/secure-settings-core-rs",
@@ -9,9 +10,17 @@ members = [
     "services/auto-reboot-daemon-rs",
     "services/baseband-proxy-hal-rs",
     "services/media-isolate-coordinator-rs",
+    # P0: Critical security
     "services/duress-pin-daemon-rs",
     "services/deadman-switch-rs",
     "services/baseband-firmware-guard-rs",
+    # P1: High priority
+    "services/vpn-killswitch-rs",
+    "services/esim-manager-rs",
+    "services/remote-attestation-rs",
+    # P2: Advanced capabilities
+    "services/pqc-keystore-rs",
+    "services/tor-proxy-rs",
 ]
 
 [workspace.dependencies]
@@ -26,3 +35,6 @@ nix = { version = "0.29", features = ["socket", "uio", "fs", "signal", "process"
 sha2 = "0.10"
 hex = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
+rand = "0.8"
+base64 = "0.22"
+zeroize = { version = "1", features = ["derive"] }
