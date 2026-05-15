@@ -1,0 +1,84 @@
+# HispaShield Secure Settings Core — SELinux Type Enforcement
+
+##############################################################################
+# Type declarations
+##############################################################################
+type hispashield_settings, domain;
+type hispashield_settings_exec, exec_type, vendor_file_type, file_type;
+type hispashield_settings_socket, file_type;
+type hispashield_settings_data_file, file_type, data_file_type;
+
+##############################################################################
+# Domain transition
+##############################################################################
+init_daemon_domain(hispashield_settings)
+
+##############################################################################
+# Self permissions
+##############################################################################
+allow hispashield_settings self:capability { dac_override dac_read_search fowner fsetid };
+allow hispashield_settings self:process { fork signal sigchld };
+allow hispashield_settings self:fifo_file rw_file_perms;
+allow hispashield_settings self:unix_stream_socket { create_socket_perms listen accept };
+
+##############################################################################
+# Unix domain socket at /run/hispashield/settings.sock
+##############################################################################
+allow hispashield_settings hispashield_settings_socket:sock_file { create setattr read write unlink };
+allow hispashield_settings hispashield_settings_socket:dir { create setattr read write add_name remove_name search };
+
+# Who can connect to the settings socket
+allow { system_server platform_app priv_app shell hispashield_npd hispashield_sensorguard }
+    hispashield_settings_socket:sock_file write;
+allow { system_server platform_app priv_app shell hispashield_npd hispashield_sensorguard }
+    hispashield_settings:unix_stream_socket connectto;
+
+# Untrusted apps may only read (not set/delete/lock)
+allow untrusted_app hispashield_settings_socket:sock_file write;
+allow untrusted_app hispashield_settings:unix_stream_socket connectto;
+
+##############################################################################
+# Persistent key-value store: /data/hispashield/settings.json
+##############################################################################
+allow hispashield_settings hispashield_settings_data_file:dir { create read write add_name remove_name search };
+allow hispashield_settings hispashield_settings_data_file:file { create read write open getattr setattr rename unlink };
+
+# Atomic write requires creating a temp file and renaming
+allow hispashield_settings hispashield_settings_data_file:file { create open write rename };
+
+##############################################################################
+# Read-only settings bootstrap at boot
+##############################################################################
+# Read AVB/dm-verity result from kernel (sysfs/proc)
+allow hispashield_settings sysfs:file r_file_perms;
+allow hispashield_settings proc:file r_file_perms;
+
+##############################################################################
+# Logging
+##############################################################################
+allow hispashield_settings log_device:chr_file rw_file_perms;
+allow hispashield_settings kmsg_device:chr_file { read write open };
+
+##############################################################################
+# EXPLICIT DENIALS
+##############################################################################
+
+# No network access
+neverallow hispashield_settings self:tcp_socket create;
+neverallow hispashield_settings self:udp_socket create;
+
+# Cannot access other settings providers (avoid circular dependency)
+neverallow hispashield_settings settings_data_file:file write;
+
+# No camera or microphone
+neverallow hispashield_settings camera_device:chr_file { read write open ioctl };
+neverallow hispashield_settings audio_device:chr_file { write open ioctl };
+
+# Cannot execute arbitrary binaries
+neverallow hispashield_settings { exec_type -hispashield_settings_exec }:file execute;
+
+# Cannot access app private data
+neverallow hispashield_settings app_data_file:file { read write open };
+
+# Cannot write to dm-verity metadata
+neverallow hispashield_settings dm_device:blk_file write;
