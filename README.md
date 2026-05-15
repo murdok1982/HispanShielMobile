@@ -2,244 +2,361 @@
   <img src="docs/logo.png" alt="HispaShield Mobile Logo" width="350"/>
   <br/>
   <h1>🛡️ HispaShield Mobile OS</h1>
-  <p><strong>Sistema Operativo Móvil Enfocado en la Privacidad Defensiva / Defensive Privacy Mobile OS</strong></p>
+  <p><strong>Sistema Operativo Móvil de Grado Defensa — Privacidad Extrema / Defense-Grade Mobile OS — Extreme Privacy</strong></p>
 
   [![Rust](https://img.shields.io/badge/Rust-Memory%20Safe-orange.svg?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
   [![AOSP](https://img.shields.io/badge/AOSP-Based-green.svg?style=for-the-badge&logo=android)](https://source.android.com/)
   [![SELinux](https://img.shields.io/badge/SELinux-Enforcing-blue.svg?style=for-the-badge)](https://selinuxproject.org/)
-  [![License](https://img.shields.io/badge/License-MIT-purple.svg?style=for-the-badge)](LICENSE)
+  [![Post-Quantum](https://img.shields.io/badge/PQC-ML--KEM--768%20%7C%20ML--DSA--65-purple.svg?style=for-the-badge)](https://csrc.nist.gov/pubs/fips/203/final)
+  [![Tor](https://img.shields.io/badge/Tor-Transparent%20Proxy-7d4698.svg?style=for-the-badge&logo=torproject)](https://www.torproject.org/)
+  [![License](https://img.shields.io/badge/License-MIT-gray.svg?style=for-the-badge)](LICENSE)
 </div>
 
 <br/>
 
-## 🧭 System Architecture & Ecosystem
+## 🧭 Arquitectura General del Sistema
 
 ```mermaid
 mindmap
   root((HispaShield Mobile))
-    Core System
-        Hardened AOSP Base
-        Upstream Kernel Patches
-        Minimal Attack Surface
-    Rust Safety Daemons
-        Network Policy Daemon
-        Sensor Guard
-        Secure Settings Core
-        Profile Isolation
-    Hardware Trust
-        Android Verified Boot AVB
-        Titan M2 Integration
-        Hardware-Backed Keystore
-    Exploit Mitigation
+    Capa de Aplicación
+        Privacy Dashboard Flutter
+        Perfil Civil / Operacional
+        Bypass de Emergencias
+    Daemons de Seguridad Rust
+        Capa de Red
+            Network Policy Daemon
+            VPN Kill-Switch
+            Tor Transparent Proxy
+        Capa de Identidad
+            eSIM IMSI Rotation
+            Profile Isolation
+            GMS Compat Proxy
+        Capa Criptográfica
+            PQC Keystore ML-KEM-768
+            Secure Settings Core
+            Remote Attestation
+        Capa de Supervivencia
+            Duress PIN Daemon
+            Dead-Man Switch
+            Auto-Reboot Daemon
+        Capa de Hardware
+            Sensor Guard
+            Baseband Proxy HAL
+            Baseband Firmware Guard
+            Media Isolate Coordinator
+    Infraestructura del SO
         SELinux Strict Enforcing
-        Seccomp BPF Filters
-        Rust Memory Safety
+        Seccomp-BPF Filters
+        Android Verified Boot AVB
+        Titan M2 Secure Enclave
 ```
 
 <br/>
 
-## 🏗️ Components & Data Flow Diagram
+## 🏗️ Flujo de Datos y Componentes
 
 ```mermaid
 graph TD
-    %% Define styles
-    classDef user fill:#1e1e1e,stroke:#3ddc84,stroke-width:2px,color:#fff,rx:5px,ry:5px
-    classDef rust fill:#b7410e,stroke:#333,stroke-width:2px,color:#fff,rx:5px,ry:5px
-    classDef aosp fill:#3ddc84,stroke:#333,stroke-width:2px,color:#111,rx:5px,ry:5px
-    classDef hw fill:#555,stroke:#f1c40f,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef user fill:#1e1e1e,stroke:#3ddc84,stroke-width:2px,color:#fff
+    classDef rust fill:#b7410e,stroke:#333,stroke-width:2px,color:#fff
+    classDef pqc fill:#4b0082,stroke:#9b59b6,stroke-width:2px,color:#fff
+    classDef net fill:#0d47a1,stroke:#1565c0,stroke-width:2px,color:#fff
+    classDef surv fill:#1b5e20,stroke:#2e7d32,stroke-width:2px,color:#fff
+    classDef hw fill:#555,stroke:#f1c40f,stroke-width:2px,color:#fff
+    classDef aosp fill:#3ddc84,stroke:#333,stroke-width:2px,color:#111
 
-    %% Components
-    UserApp["📱 User / Sandbox Apps"]:::user
-    
-    subgraph AOSP Framework Layer
-        Permissions["Permission Controller"]:::aosp
-        Services["Android System Services"]:::aosp
+    UserApp["📱 App / Perfil Aislado"]:::user
+    Dashboard["🖥️ Privacy Dashboard"]:::user
+
+    subgraph Red y Anonimato
+        NPD["Network Policy Daemon"]:::net
+        VPN["VPN Kill-Switch"]:::net
+        TOR["Tor Transparent Proxy"]:::net
+        ESIM["eSIM IMSI Rotation"]:::net
     end
 
-    subgraph HispaShield Core Services
-        NPD["Network Policy Daemon (Rust)"]:::rust
-        SG["Sensor Guard (Rust)"]:::rust
-        SSC["Secure Settings Core (Rust)"]:::rust
-        PI["Profile Isolation (Rust)"]:::rust
-        GMS["GMS Compat Proxy (Rust)"]:::rust
+    subgraph Criptografía Post-Cuántica
+        PQC["PQC Keystore\nML-KEM-768 + ML-DSA-65"]:::pqc
+        ATTEST["Remote Attestation"]:::pqc
+        SSC["Secure Settings Core"]:::pqc
     end
 
-    subgraph OS Kernel Layer
-        SELinux["🛡️ SELinux (Default Deny)"]:::aosp
-        Seccomp["🔒 Seccomp-bpf Filters"]:::aosp
+    subgraph Supervivencia Operacional
+        DURESS["Duress PIN Daemon"]:::surv
+        DMZ["Dead-Man Switch"]:::surv
+        REBOOT["Auto-Reboot Daemon"]:::surv
     end
 
-    subgraph Secure Hardware
-        AVB["Verified Boot (AVB)"]:::hw
-        Titan["Titan M2 / Secure Enclave"]:::hw
+    subgraph Hardware y Aislamiento
+        SG["Sensor Guard"]:::rust
+        BB["Baseband Proxy HAL"]:::rust
+        BBG["Baseband Firmware Guard"]:::rust
+        MEDIA["Media Isolate Coordinator"]:::rust
+        PI["Profile Isolation"]:::rust
+        GMS["GMS Compat Proxy"]:::rust
     end
 
-    %% Routing
-    UserApp -->|Interacts| Services
-    UserApp -.->|Network Traffic| NPD
-    UserApp -.->|Hardware Access| SG
-    
-    Services --> Permissions
-    Permissions --> SSC
-    Services --> GMS
-    PI --> UserApp
-    
+    subgraph Kernel
+        SELinux["🛡️ SELinux Default-Deny"]:::aosp
+        Seccomp["🔒 Seccomp-BPF"]:::aosp
+    end
+
+    subgraph Hardware Seguro
+        AVB["Verified Boot AVB"]:::hw
+        Titan["Titan M2 Enclave"]:::hw
+    end
+
+    UserApp --> NPD
+    UserApp --> SG
+    UserApp --> PI
+    NPD --> VPN --> TOR
+    TOR --> ESIM
+    PQC --> ATTEST
+    PQC --> SSC
+    DURESS --> SSC
+    DMZ --> SSC
+    BB --> BBG
+    MEDIA --> Seccomp
     NPD --> SELinux
-    SG --> Seccomp
-    SSC --> Seccomp
-    
     SELinux --> AVB
     Seccomp --> Titan
+    Dashboard --> NPD & SG & PQC & DURESS & DMZ & TOR
 ```
 
 <br/>
 
----
+## 🔐 Stack de Seguridad Completo
 
-## 🌍 Español
+| Nivel | Componente | Tecnología | Función |
+|---|---|---|---|
+| **L0 — Hardware** | Titan M2 | Secure Enclave | Custodia de claves maestras |
+| **L0 — Boot** | AVB + Bootloader Bloqueado | Android Verified Boot | Anti-implante firmware |
+| **L1 — Kernel** | SELinux Enforcing | TE + neverallow | MAC default-deny total |
+| **L1 — Kernel** | Seccomp-BPF | eBPF filters | Syscall allowlist por proceso |
+| **L2 — Cripto** | PQC Keystore | ML-KEM-768 + ML-DSA-65 | Post-quantum key exchange y firma |
+| **L2 — Cripto** | Remote Attestation | HMAC-SHA256 + cert chain | Zero-trust device verification |
+| **L3 — Red** | Network Policy Daemon | Default Deny por UID | Cortafuegos a nivel proceso |
+| **L3 — Red** | VPN Kill-Switch | iptables OUTPUT DROP | Sin fugas si VPN cae |
+| **L3 — Red** | Tor Transparent Proxy | TPROXY + DNS-over-Tor | Anonimización total de tráfico |
+| **L4 — Identidad** | eSIM IMSI Rotation | AT+CSIM + jitter | Anti-triangulación |
+| **L4 — Identidad** | Profile Isolation | bind-mount ACL | Separación civil/operacional |
+| **L4 — Identidad** | GMS Compat Proxy | Telemetry stripping | Google sin rastreo |
+| **L5 — Sensores** | Sensor Guard | TTL tokens por sensor | Acceso cámara/mic bajo demanda |
+| **L5 — Baseband** | Baseband Proxy HAL | AT command filter | Block 20+ comandos peligrosos |
+| **L5 — Baseband** | Baseband Firmware Guard | SHA-256 integrity + IMSI heuristics | Detección IMSI Catcher |
+| **L5 — Media** | Media Isolate Coordinator | Linux namespaces + cgroups | Codec crash-safe |
+| **L6 — Supervivencia** | Duress PIN | SHA-256 constant-time | PIN pánico con beacon cifrado |
+| **L6 — Supervivencia** | Dead-Man Switch | Heartbeat TTL | Auto-wipe si no hay check-in |
+| **L6 — Supervivencia** | Auto-Reboot Daemon | Scheduled nix::reboot | Limpieza periódica de RAM |
 
-**HispaShield Mobile** es un sistema operativo móvil de grado de producción, centrado en la privacidad extrema y diseñado bajo los principios de aislamiento, mínimo privilegio y mitigación de exploits. Basado en un núcleo endurecido de AOSP, reemplaza los servicios críticos con demonios escritos en **Rust** (seguros a nivel de memoria) e impone controles de acceso obligatorios drásticos utilizando **SELinux**.
+<br/>
 
-### ✨ Características Principales
-*   **Aislamiento y Sandboxing Fuerte:** Separación estricta de perfiles y restricciones drásticas de red (`Default Deny`).
-*   **Demonios Críticos en Rust:** Componentes nativos seguros contra vulnerabilidades de memoria (`Network Policy Daemon`, `Sensor Guard`, `Secure Settings Core`).
-*   **Seguridad Defensiva y Transparencia:** Diseñado exclusivamente para proteger al usuario local. Sin utilidades ofensivas, telemetría ni puertas traseras.
-*   **Protección Basada en Hardware:** Integración con *Secure Boot*, *Android Verified Boot (AVB)* y encriptación robusta gestionada desde el hardware.
+## 🧬 Stack Criptográfico Post-Cuántico
 
-### 🛠️ Requisitos de Compilación e Instalación
-**Requisitos Básicos:**
-*   Dispositivo de referencia soportado (Ej: Google Pixel 8 / 8 Pro, SoC Tensor G3).
-*   PC con Linux (Ubuntu 22.04+ o Arch Linux) con al menos 32GB de RAM y 500GB SSD para compilar AOSP.
-*   Herramientas: `git`, `repo`, `cargo` (Rust), `fastboot`, `adb`.
+```mermaid
+sequenceDiagram
+    participant Device as 📱 HispaShield
+    participant PQC as PQC Keystore
+    participant Server as 🖥️ Servidor Zero-Trust
 
-**Guía de Instalación Paso a Paso:**
-1.  **Clonar AOSP y HispaShield**: Inicializa el árbol de AOSP e integra este monorepo en el directorio `vendor/hispashield`.
-    ```bash
-    repo init -u https://android.googlesource.com/platform/manifest -b android-14.0.0_rXX
-    # Añadir manifest local de HispaShield y sincronizar
-    repo sync -c -j8
-    ```
-2.  **Generar Claves Maestras (Offline)**: Ejecuta `build/scripts/generate_release_keys.sh` en un entorno seguro para crear tu cadena de confianza (AVB Secure Boot).
-3.  **Compilar la ROM**:
-    ```bash
-    source build/envsetup.sh
-    lunch hispashield_shiba-user
-    m -j$(nproc)
-    ```
-4.  **Desbloqueo y Flasheo**:
-    *   Habilita "OEM Unlocking" en tu celular.
-    *   Reinicia en modo bootloader: `adb reboot bootloader`
-    *   Desbloquea el bootloader: `fastboot flashing unlock` *(⚠️ ESTO BORRARÁ LOS DATOS).*
-    *   Instala la ROM compilada: `fastboot update hispashield-shiba-target_files.zip`
-5.  **Re-bloqueo de Bootloader (Crítico)**:
-    *   Flashea tu clave pública AVB: `fastboot erase avb_custom_key && fastboot flash avb_custom_key <tu_clave.bin>`
-    *   Bloquea de nuevo el bootloader para restaurar el Verified Boot: `fastboot flashing lock`
+    Note over Device,Server: Establecimiento de Canal Seguro Híbrido
+    Device->>PQC: generate_keypair(ML-KEM-768)
+    PQC-->>Device: (pk_kyber: 1184B, sk_kyber: 2400B)
 
----
+    Device->>Server: Attestation Report + pk_kyber
+    Server->>Server: Verificar cadena AVB + daemon hashes
+    Server-->>Device: encapsulate(pk_kyber) → ciphertext: 1088B
 
-## 🇬🇧 English
+    Device->>PQC: decapsulate(sk_kyber, ciphertext)
+    PQC-->>Device: shared_secret: 32B (Zeroizing<Vec<u8>>)
 
-**HispaShield Mobile** is a production-grade, privacy-centric mobile operating system designed around principles of strict isolation, least privilege, and exploit mitigation. Built upon a hardened AOSP foundation, it replaces critical services with memory-safe **Rust** daemons and enforces draconian mandatory access controls via **SELinux**.
+    Note over Device,Server: Canal cifrado. Claves en RAM zeroed tras uso.
 
-### ✨ Core Features
-*   **Strong Compartmentalization:** Strict profile separation and default-deny network controls.
-*   **Critical Daemons in Rust:** Memory-safe native components (`Network Policy Daemon`, `Sensor Guard`, `Secure Settings Core`).
-*   **Defensive Security & Transparency:** Exclusively designed to protect the local user. Zero offensive tools, zero telemetry, no backdoors.
-*   **Hardware-Backed Protection:** Integration with *Secure Boot*, *Android Verified Boot (AVB)*, and robust encryption managed within hardware.
+    Device->>PQC: sign(ML-DSA-65, mensaje_operacional)
+    PQC-->>Device: signature: 3309B
+    Device->>Server: mensaje + firma
+    Server->>Server: verify(pk_dsa, mensaje, firma) ✓
+```
 
-### 🛠️ Requirements & Installation Guide
-**Basic Requirements:**
-*   Supported reference hardware (e.g., Google Pixel 8 / 8 Pro, Tensor G3 SoC).
-*   Linux Build Server (Ubuntu 22.04+ or Arch) with 32GB+ RAM and 500GB+ SSD for the AOSP tree.
-*   Toolchains: `git`, `repo`, `cargo` (Rust), `fastboot`, `adb`.
+<br/>
 
-**Step-by-Step Installation:**
-1.  **Clone AOSP & HispaShield**: Initialize the AOSP tree and overlay this monorepo into `vendor/hispashield`.
-    ```bash
-    repo init -u https://android.googlesource.com/platform/manifest -b android-14.0.0_rXX
-    repo sync -c -j8
-    ```
-2.  **Generate Master Keys (Offline)**: Run `build/scripts/generate_release_keys.sh` in an air-gapped environment to create your AVB trust chain.
-3.  **Compile the OS**:
-    ```bash
-    source build/envsetup.sh
-    lunch hispashield_shiba-user
-    m -j$(nproc)
-    ```
-4.  **OEM Unlock & Flash**:
-    *   Enable "OEM Unlocking" in Developer Settings.
-    *   Reboot to bootloader: `adb reboot bootloader`
-    *   Unlock bootloader: `fastboot flashing unlock` *(⚠️ THIS WIPES ALL DATA).*
-    *   Flash the built ROM: `fastboot update hispashield-shiba-target_files.zip`
-5.  **Re-lock Bootloader (Critical)**:
-    *   Flash your custom public AVB key: `fastboot erase avb_custom_key && fastboot flash avb_custom_key <your_key.bin>`
-    *   Relock the bootloader for full Verified Boot enforcement: `fastboot flashing lock`
+## 🕵️ Detección de IMSI Catcher
 
----
+El `Baseband Firmware Guard` implementa 6 heurísticas en tiempo real:
 
-### 💰 Support my open-source work | Apoya mi trabajo de código abierto
+| Heurística | Puntos | Descripción |
+|---|---|---|
+| **Downgrade 4G/5G → 2G** | 35 | Forzado a GSM — técnica clásica de IMSI Catcher |
+| **Señal anormalmente fuerte** | 30 | Torre desconocida con RSSI > −50 dBm (proximidad física) |
+| **Rotación rápida de torres** | 20 | ≥5 torres distintas en 120 segundos (siguiendo al objetivo) |
+| **LAC inválido** | 15 | LAC=0, 65535 o >60000 (no en rango operador legítimo) |
+| **Cell ID centinela** | 10 | Cell ID = 0 o 1, o GSM cell_id >65535 |
+| **GSM fuerte a torre nueva** | 20 | Posible proxy sin cifrado (A5/0) |
 
-If you find this project useful, consider supporting it financially to help me dedicate more time to active open-source development.  
-*Si este proyecto te ha sido útil, considera apoyarlo financieramente para mantener activo su desarrollo.*
+Score ≥ 70 → **CRITICAL** → alerta al Duress Daemon automáticamente.
 
-**Bitcoin Donation**
+<br/>
+
+## 🌐 Proxy Tor Transparente
+
+```mermaid
+flowchart LR
+    App["📱 App\n(cualquier UID)"]
+    Bypass["🚨 Bypass UIDs\n(Emergencias 112)"]
+    DNS["HISPASHIELD_TOR_DNS\nchain (iptables nat)"]
+    TRANS["HISPASHIELD_TOR_TRANS\nchain (iptables nat)"]
+    TorDNS["🧅 Tor DNS\n:5353"]
+    TorTrans["🧅 Tor TPROXY\n:9040"]
+    Exit["🌍 Exit Node\n(DE/NL/IS)\nno Five Eyes"]
+
+    App -->|"UDP :53"| DNS --> TorDNS --> Exit
+    App -->|"TCP :443/:80"| TRANS --> TorTrans --> Exit
+    Bypass -->|"RETURN rule"| Exit
+```
+
+Países de salida preferidos: 🇩🇪 Alemania, 🇳🇱 Países Bajos, 🇮🇸 Islandia  
+Países excluidos: 🇺🇸🇬🇧🇦🇺🇨🇦🇳🇿 (Five Eyes)
+
+<br/>
+
+## 🆘 Protocolo de Duress PIN
+
+```mermaid
+sequenceDiagram
+    participant Op as 👤 Operador
+    participant Daemon as Duress Daemon
+    participant Keys as /data/hispashield/keys/
+    participant Beacon as 📡 Servidor Alerta (UDP)
+
+    Op->>Daemon: verify_pin(duress_pin_hash)
+    Daemon-->>Op: {"result":"normal"} ← respuesta IDÉNTICA al PIN normal
+    Note over Daemon: Detección silenciosa — el atacante no sabe
+    Daemon->>Beacon: UDP cifrado XOR "DURESS:<timestamp>"
+    Daemon->>Keys: remove_dir_all() — claves destruidas
+    Note over Op: El dispositivo continúa aparentando funcionar (datos señuelo)
+```
+
+<br/>
+
+## 🛠️ Compilación e Instalación
+
+### Requisitos
+- Linux (Ubuntu 22.04+ o Arch) con ≥32 GB RAM y ≥500 GB SSD
+- Rust 1.75+ (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
+- Android SDK + NDK r27, `repo`, `fastboot`, `adb`
+- Dispositivo referencia: **Google Pixel 8** (codename: `shiba`, SoC Tensor G3)
+
+### Compilar los daemons Rust
+```bash
+# Clonar repositorio
+git clone https://github.com/murdok1982/HispanShielMobile
+cd HispanShielMobile
+
+# Compilar workspace completo (16 daemons)
+cargo build --workspace --release
+
+# Ejecutar tests
+cargo test --workspace
+
+# Cross-compile para aarch64-android
+rustup target add aarch64-linux-android
+cargo build --workspace --release --target aarch64-linux-android
+```
+
+### Compilar la ROM AOSP
+```bash
+# Generar claves de firma (OFFLINE, entorno air-gapped)
+bash build/scripts/generate_release_keys.sh
+
+# Compilar ROM para Pixel 8
+bash build/scripts/build_rom.sh
+
+# Flashear
+adb reboot bootloader
+fastboot flashing unlock           # ⚠️ BORRA TODOS LOS DATOS
+fastboot update hispashield-shiba-target_files.zip
+fastboot erase avb_custom_key
+fastboot flash avb_custom_key keys/avb/avb_pkmd.bin
+fastboot flashing lock             # CRÍTICO: habilita Verified Boot
+```
+
+<br/>
+
+## 📁 Estructura del Repositorio
+
+```
+HispanShielMobile/
+├── Cargo.toml                        # Workspace Rust (16 miembros)
+├── services/
+│   ├── network-policy-daemon-rs/     # L3: Default Deny por UID
+│   ├── sensor-guard-rs/              # L5: Tokens TTL por sensor
+│   ├── secure-settings-core-rs/      # L2: KV store atómico
+│   ├── profile-isolation-rs/         # L4: ACL cross-profile
+│   ├── gms-compat-proxy-rs/          # L4: Strip telemetría Google
+│   ├── auto-reboot-daemon-rs/        # L6: Reboot programado seguro
+│   ├── baseband-proxy-hal-rs/        # L5: Filtro AT commands
+│   ├── media-isolate-coordinator-rs/ # L5: Codec namespaces
+│   ├── duress-pin-daemon-rs/         # L6: PIN pánico + beacon
+│   ├── deadman-switch-rs/            # L6: Auto-wipe heartbeat
+│   ├── baseband-firmware-guard-rs/   # L5: Firmware integrity + IMSI detection
+│   ├── vpn-killswitch-rs/            # L3: Kill-switch + anti-DNS leak
+│   ├── esim-manager-rs/              # L4: Rotación IMSI automática
+│   ├── remote-attestation-rs/        # L2: Zero-trust attestation
+│   ├── pqc-keystore-rs/              # L2: ML-KEM-768 + ML-DSA-65
+│   └── tor-proxy-rs/                 # L3: Tor TPROXY transparente
+├── sepolicy/private/                 # Políticas SELinux TE
+├── build/scripts/                    # Generación de claves + build ROM
+├── tests/integration/                # Tests de integración Tokio
+├── ui/privacy-dashboard/             # Flutter Material 3 dashboard
+├── docs/
+│   ├── adr/                          # Architectural Decision Records
+│   ├── threat-model/                 # STRIDE threat model
+│   ├── pqc/                          # Criptografía post-cuántica
+│   └── tor/                          # Integración Tor
+└── research/
+    ├── baseband-isolation/           # AT commands, QMI/MBIM, CVEs
+    ├── compat-layer/                 # microG, sandboxed Play
+    └── media-parsing/                # Stagefright, MTE, Rust codecs
+```
+
+<br/>
+
+## 💰 Apoya el Proyecto
 
 ```text
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃  ₿  Bitcoin Donation Address  ₿   ┃
 ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-┃                                   ┃
 ┃   bc1qqphwht25vjzlptwzjyjt3sex    ┃
 ┃   7e3p8twn390fkw                  ┃
-┃                                   ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 ```
+**Red:** Bitcoin (BTC) · **Dirección:** `bc1qqphwht25vjzlptwzjyjt3sex7e3p8twn390fkw`
 
-**Network / Red:** Bitcoin (BTC)  
-**Address / Dirección:** `bc1qqphwht25vjzlptwzjyjt3sex7e3p8twn390fkw`
+<br/>
 
-**Your support helps me dedicate more time to open-source development! 🙏**  
-**¡Vuestro apoyo me ayuda a dedicar más tiempo al desarrollo de código abierto! 🙏**
+## 🎖️ CENTRO DE COMUNICACIONES OFICIALES
 
----
-
-## 🎖️ CENTRO DE COMUNICACIONES Y REPORTES OFICIALES
-**NIVEL DE ACCESO:** AUTORIZADO | **DESTINATARIO:** COMANDANCIA DE DESARROLLO (gustavolobatoclara@gmail.com)
-
-A través del siguiente portal de comunicaciones, el personal autorizado puede emitir reportes de incidencias, fallas críticas en despliegue (compilación) o solicitudes de mejoras estratégicas. Seleccione la directiva correspondiente para visualizar los protocolos de envío:
+**NIVEL DE ACCESO:** AUTORIZADO | **DESTINATARIO:** gustavolobatoclara@gmail.com
 
 <details>
-<summary><b>🚨 REPORTAR QUEJA O INCIDENCIA DISCIPLINARIA / OPERATIVA</b></summary>
-<br>
-Para tramitar una queja sobre el funcionamiento, estructura o contenido del sistema, envíe un mensaje a <b>gustavolobatoclara@gmail.com</b> siguiendo este protocolo:
-<ol>
-  <li><b>Asunto:</b> [QUEJA] - Nombre del Sistema - Breve descripción.</li>
-  <li><b>Cuerpo del mensaje:</b> Detallar claramente la incidencia, impacto operativo y, si es posible, la evidencia (capturas o logs).</li>
-  <li><b>Prioridad:</b> Indicar si es de atención inmediata o diferida.</li>
-</ol>
+<summary><b>🚨 REPORTAR INCIDENCIA OPERATIVA</b></summary>
+<br>Envía a <b>gustavolobatoclara@gmail.com</b>:<br>
+<b>Asunto:</b> [QUEJA] Sistema - Descripción<br>
+<b>Cuerpo:</b> Incidencia, impacto, evidencia (capturas/logs)
 </details>
 
 <details>
-<summary><b>🛠️ REPORTE DE PROBLEMAS DE COMPILACIÓN O DESPLIEGUE</b></summary>
-<br>
-Si experimenta fallos durante la fase de compilación o instalación del sistema, reporte a <b>gustavolobatoclara@gmail.com</b> con la siguiente estructura técnica:
-<ol>
-  <li><b>Asunto:</b> [COMPILACIÓN] - Falla en entorno &lt;Entorno/OS&gt;.</li>
-  <li><b>Especificaciones:</b> Sistema Operativo, versión de dependencias y herramientas de compilación utilizadas.</li>
-  <li><b>Traza de Error (Logs):</b> Adjunte el log completo de errores proporcionado por la terminal (en formato texto o captura legible).</li>
-  <li><b>Pasos de Reproducción:</b> Secuencia exacta de comandos ejecutados antes del fallo crítico.</li>
-</ol>
+<summary><b>🛠️ REPORTE DE COMPILACIÓN / DESPLIEGUE</b></summary>
+<br>Envía a <b>gustavolobatoclara@gmail.com</b>:<br>
+<b>Asunto:</b> [COMPILACIÓN] Falla en &lt;OS/entorno&gt;<br>
+<b>Incluir:</b> SO, versiones de dependencias, traza completa de error, pasos de reproducción
 </details>
 
 <details>
-<summary><b>💡 SUGERENCIAS O SOLICITUDES DE DESARROLLO</b></summary>
-<br>
-Para proponer nuevas capacidades tácticas, módulos de inteligencia o mejoras de arquitectura, envíe su solicitud a <b>gustavolobatoclara@gmail.com</b>:
-<ol>
-  <li><b>Asunto:</b> [PROPUESTA] - Mejora o Nuevo Módulo.</li>
-  <li><b>Objetivo Táctico:</b> ¿Qué problema resuelve o qué ventaja proporciona esta nueva característica?</li>
-  <li><b>Viabilidad:</b> (Opcional) Posible enfoque técnico o herramientas recomendadas para su implementación.</li>
-</ol>
+<summary><b>💡 PROPUESTAS DE DESARROLLO</b></summary>
+<br>Envía a <b>gustavolobatoclara@gmail.com</b>:<br>
+<b>Asunto:</b> [PROPUESTA] Módulo/Mejora<br>
+<b>Incluir:</b> Objetivo táctico, problema que resuelve, viabilidad técnica
 </details>
-
----
